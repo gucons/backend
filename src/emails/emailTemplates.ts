@@ -1,5 +1,5 @@
-export function createWelcomeEmailTemplate(name: String, profileUrl: string) {
-	return `
+export function createWelcomeEmailTemplate(profileUrl: string) {
+    return `
   <!DOCTYPE html>
   <html lang="en">
   <head>
@@ -36,9 +36,9 @@ export function createWelcomeEmailTemplate(name: String, profileUrl: string) {
 }
 
 export const createConnectionAcceptedEmailTemplate = (
-	senderName: string,
-	recipientName: string,
-	profileUrl: string
+    senderName: string,
+    recipientName: string,
+    profileUrl: string
 ) => `
 <!DOCTYPE html>
 <html lang="en">
@@ -74,10 +74,10 @@ export const createConnectionAcceptedEmailTemplate = (
 `;
 
 export const createCommentNotificationEmailTemplate = (
-	recipientName: string,
-	commenterName: string,
-	postUrl: string,
-	commentContent: string
+    recipientName: string,
+    commenterName: string,
+    postUrl: string,
+    commentContent: string
 ) => `
 <!DOCTYPE html>
 <html lang="en">

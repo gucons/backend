@@ -6,38 +6,23 @@ import prismaClient from "../prisma/prismaClient";
 
 export const signup = async (req: Request, res: Response) => {
     try {
-        const { name, username, email, password } = req.body;
+        const { email, password } = req.body;
 
-        if (!name || !username || !email || !password) {
+        if (!email || !password) {
             res.status(400).json({
                 success: false,
-                message: "All fields are required",
+                message: "Email and password are required",
             });
             return;
         }
 
         const existingEmail = await prismaClient.prisma.user.findUnique({
-            where: {
-                email,
-            },
+            where: { email },
         });
         if (existingEmail) {
             res.status(400).json({
                 success: false,
                 message: "Email already exists",
-            });
-            return;
-        }
-
-        const existingUsername = await prismaClient.prisma.user.findUnique({
-            where: {
-                username,
-            },
-        });
-        if (existingUsername) {
-            res.status(400).json({
-                success: false,
-                message: "Username already exists",
             });
             return;
         }
@@ -55,10 +40,9 @@ export const signup = async (req: Request, res: Response) => {
 
         const user = await prismaClient.prisma.user.create({
             data: {
-                name,
-                username,
                 email,
                 password: hashedPassword,
+                role: "PENDING", // Assign the role and data based on user choice afterwards
             },
         });
 
@@ -70,15 +54,16 @@ export const signup = async (req: Request, res: Response) => {
             });
             return;
         }
+
         const token = jwt.sign({ userId: user.id }, secret, {
             expiresIn: "3d",
         });
 
         res.cookie("jwt-token", token, {
-            httpOnly: true, // prevent XSS attack
+            httpOnly: true,
             maxAge: 3 * 24 * 60 * 60 * 1000,
-            sameSite: "strict", // prevent CSRF attacks,
-            secure: process.env.NODE_ENV === "production", // prevents man-in-the-middle attacks
+            sameSite: "strict",
+            secure: process.env.NODE_ENV === "production",
         });
 
         res.status(201).json({
@@ -86,11 +71,11 @@ export const signup = async (req: Request, res: Response) => {
             message: "User registered successfully",
         });
 
-        const profileUrl = process.env.CLIENT_URL + "/profile/" + user.username;
+        const profileUrl = process.env.CLIENT_URL + "/profile/" + user.id; // Adjust based on your routing
 
         try {
             console.log("Email sent to:", user.email);
-            await sendWelcomeEmail(user.email, user.name, profileUrl);
+            await sendWelcomeEmail(user.email, profileUrl);
         } catch (emailError) {
             console.error("Error sending welcome Email", emailError);
         }
@@ -105,13 +90,11 @@ export const signup = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
     try {
-        const { username, password } = req.body;
+        const { email, password } = req.body;
 
         // Check if user exists
         const user = await prismaClient.prisma.user.findUnique({
-            where: {
-                username,
-            },
+            where: { email },
         });
         if (!user) {
             res.status(400).json({
@@ -144,7 +127,8 @@ export const login = async (req: Request, res: Response) => {
         const token = jwt.sign({ userId: user.id }, secret, {
             expiresIn: "3d",
         });
-        await res.cookie("jwt-token", token, {
+
+        res.cookie("jwt-token", token, {
             httpOnly: true,
             maxAge: 3 * 24 * 60 * 60 * 1000,
             sameSite: "strict",
@@ -165,7 +149,16 @@ export const logout = (req: Request, res: Response) => {
 
 export const getCurrentUser = async (req: Request, res: Response) => {
     try {
-        res.json(req.user);
+        const user = await prismaClient.prisma.user.findUnique({
+            where: { id: req.user?.id },
+        });
+
+        if (!user) {
+            res.status(404).json({ success: false, message: "User not found" });
+            return;
+        }
+
+        res.json({ success: true, user });
     } catch (error) {
         console.error("Error in getCurrentUser controller:", error);
         res.status(500).json({ success: false, message: "Server error" });
