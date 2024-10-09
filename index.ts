@@ -16,11 +16,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const __dirname = path.resolve();
 const corsOptions = {
-	origin:
-		process.env.NODE_ENV !== "production"
-			? "http://localhost:5173"
-			: process.env.CLIENT_URL,
-	credentials: true,
+    origin: process.env.CLIENT_URL,
+    credentials: true,
 };
 
 app.use(cors(corsOptions));
@@ -34,18 +31,20 @@ app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/connections", connectionRoutes);
 
 if (process.env.NODE_ENV === "production") {
-	console.log("Serving frontend...");
-	app.use(express.static(path.join(__dirname, "../frontend/dist")));
+    console.log("Serving frontend...");
+    app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
-	app.get("*", (req, res) => {
-		res.sendFile(path.resolve(__dirname, "../frontend", "dist", "index.html"));
-	});
+    app.get("*", (req, res) => {
+        res.sendFile(
+            path.resolve(__dirname, "../frontend", "dist", "index.html")
+        );
+    });
 }
 
 app.get("/", (req, res) => {
-	res.send("API is running...");
+    res.send("API is running...");
 });
 
 app.listen(PORT, () => {
-	console.log(`Server running on port https://localhost:${PORT}`);
+    console.log(`Server running on port https://localhost:${PORT}`);
 });

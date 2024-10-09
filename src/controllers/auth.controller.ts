@@ -66,7 +66,7 @@ export const signup = async (req: Request, res: Response) => {
             secure: process.env.NODE_ENV === "production",
         });
 
-        res.status(201).json({
+        res.status(200).json({
             success: true,
             message: "User registered successfully",
         });
@@ -75,7 +75,7 @@ export const signup = async (req: Request, res: Response) => {
 
         try {
             console.log("Email sent to:", user.email);
-            await sendWelcomeEmail(user.email, profileUrl);
+            // await sendWelcomeEmail(user.email, profileUrl);
         } catch (emailError) {
             console.error("Error sending welcome Email", emailError);
         }
@@ -124,7 +124,7 @@ export const login = async (req: Request, res: Response) => {
         }
 
         // Create and send token
-        const token = jwt.sign({ userId: user.id }, secret, {
+        const token = jwt.sign({ userId: user.id, email: user.email }, secret, {
             expiresIn: "3d",
         });
 
@@ -135,7 +135,10 @@ export const login = async (req: Request, res: Response) => {
             secure: process.env.NODE_ENV === "production",
         });
 
-        res.json({ success: true, message: "Logged in successfully" });
+        res.status(200).json({
+            success: true,
+            message: "Logged in successfully",
+        });
     } catch (error) {
         console.error("Error in login controller:", error);
         res.status(500).json({ success: false, message: "Server error" });
@@ -144,23 +147,25 @@ export const login = async (req: Request, res: Response) => {
 
 export const logout = (req: Request, res: Response) => {
     res.clearCookie("jwt-token");
-    res.json({ success: true, message: "Logged out successfully" });
+    res.status(200).json({ success: true, message: "Logged out successfully" });
 };
 
 export const getCurrentUser = async (req: Request, res: Response) => {
-    try {
-        const user = await prismaClient.prisma.user.findUnique({
-            where: { id: req.user?.id },
-        });
+    console.log("User:", req.user);
+    res.status(200).json({ success: true, user: req.user });
 
-        if (!user) {
-            res.status(404).json({ success: false, message: "User not found" });
-            return;
-        }
+    // try {
+    //     const user = await prismaClient.prisma.user.findUnique({
+    //         where: { id: req.user?.id },
+    //     });
 
-        res.json({ success: true, user });
-    } catch (error) {
-        console.error("Error in getCurrentUser controller:", error);
-        res.status(500).json({ success: false, message: "Server error" });
-    }
+    //     if (!user) {
+    //         res.status(404).json({ success: false, message: "User not found" });
+    //         return;
+    //     }
+
+    // } catch (error) {
+    //     console.error("Error in getCurrentUser controller:", error);
+    //     res.status(500).json({ success: false, message: "Server error" });
+    // }
 };
