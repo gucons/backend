@@ -1,0 +1,33 @@
+name: CI/CD Pipeline
+
+on:
+    push:
+        branches:
+            - master
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v2
+              with:
+                  node-version: "22.x"
+
+            - name: Install dependencies
+              run: npm install
+
+            - name: Deploy to VPS
+              env:
+                  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }} # Add your SSH key as a secret in GitHub
+                  VPS_IP: ${{ secrets.VPS_IP }} # Add your VPS IP as a secret in GitHub
+                  VPS_USER: ${{ secrets.VPS_USER }} # Add your VPS user as a secret in GitHub
+              run: |
+                  echo "$SSH_PRIVATE_KEY" > private_key
+                  chmod 600 private_key
+                  scp -o StrictHostKeyChecking=no -i private_key -r * $VPS_USER@$VPS_IP:/code/backend
+                  ssh -o StrictHostKeyChecking=no -i private_key $VPS_USER@$VPS_IP "cd code/backend && npm install --production && pm2 restart backend"
