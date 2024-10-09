@@ -26,15 +26,18 @@ enum UserRole {
 }
 
 model Consultant {
-  id             String @id @default(uuid())
-  userId         String @unique
-  user           User   @relation(fields: [userId], references: [id])
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
   // Basic Info
-  firstName      String
-  lastName       String
-  profilePicture String @default("")
-  contactEmail   String @unique
-  phoneNumber    String
-  location       String
-  timeZone       String
+  firstName      String // Candidate's first name
+  lastName       String // Candidate's last name
+  profilePicture String   @default("") // Upload or link to a professional photo
+  contactEmail   String   @unique // Candidate's email address
+  phoneNumber    String? // Contact number
+  location       String? // City, State/Province, Country
+  timeZone       String? // Candidate's timezone for scheduling purposes
+  // Add timestamps if needed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
