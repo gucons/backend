@@ -3,18 +3,33 @@ import jwt from "jsonwebtoken";
 import { sendWelcomeEmail } from "../emails/emailHandlers";
 import { Request, Response } from "express";
 import prismaClient from "../prisma/prismaClient";
+import { z } from "zod";
+import { UserRole } from "@prisma/client";
+
+const signupSchema = z.object({
+    email: z.string().email(),
+    password: z
+        .string()
+        .min(8, { message: "Password must be at least 8 characters long" })
+        .max(32, { message: "Password must be at most 32 characters long" })
+        .regex(/[a-z]/, {
+            message: "Password must contain at least one lowercase letter",
+        })
+        .regex(/[A-Z]/, {
+            message: "Password must contain at least one uppercase letter",
+        })
+        .regex(/[0-9]/, {
+            message: "Password must contain at least one number",
+        })
+        .regex(/[^a-zA-Z0-9]/, {
+            message: "Password must contain at least one special character",
+        }),
+    role: z.nativeEnum(UserRole),
+});
 
 export const signup = async (req: Request, res: Response) => {
     try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            res.status(400).json({
-                success: false,
-                message: "Email and password are required",
-            });
-            return;
-        }
+        const { email, password, role } = signupSchema.parse(req.body);
 
         const existingEmail = await prismaClient.prisma.user.findUnique({
             where: { email },
@@ -27,14 +42,6 @@ export const signup = async (req: Request, res: Response) => {
             return;
         }
 
-        if (password.length < 6) {
-            res.status(400).json({
-                success: false,
-                message: "Password must be at least 6 characters",
-            });
-            return;
-        }
-
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -42,7 +49,7 @@ export const signup = async (req: Request, res: Response) => {
             data: {
                 email,
                 password: hashedPassword,
-                role: "PENDING", // Assign the role and data based on user choice afterwards
+                role,
             },
         });
 
@@ -80,6 +87,14 @@ export const signup = async (req: Request, res: Response) => {
             console.error("Error sending welcome Email", emailError);
         }
     } catch (error: any) {
+        if (error instanceof z.ZodError) {
+            res.status(400).json({
+                success: false,
+                message: "Validation error",
+                errors: error.errors,
+            });
+            return;
+        }
         console.log("Error in signup: ", error.message);
         res.status(500).json({
             success: false,
@@ -151,21 +166,17 @@ export const logout = (req: Request, res: Response) => {
 };
 
 export const getCurrentUser = async (req: Request, res: Response) => {
-    console.log("User:", req.user);
-    res.status(200).json({ success: true, user: req.user });
-
-    // try {
-    //     const user = await prismaClient.prisma.user.findUnique({
-    //         where: { id: req.user?.id },
-    //     });
-
-    //     if (!user) {
-    //         res.status(404).json({ success: false, message: "User not found" });
-    //         return;
-    //     }
-
-    // } catch (error) {
-    //     console.error("Error in getCurrentUser controller:", error);
-    //     res.status(500).json({ success: false, message: "Server error" });
-    // }
+    try {
+        res.status(200).json({
+            success: true,
+            user: {
+                id: req.user?.id,
+                email: req.user?.email,
+                role: req.user?.role,
+            },
+        });
+    } catch (error) {
+        console.error("Error in getCurrentUser controller:", error);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
 };
