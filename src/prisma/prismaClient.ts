@@ -5,8 +5,8 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 // Handle graceful shutdown (disconnect Prisma on app termination)
-async function shutdownPrisma() {
-	await prisma.$disconnect();
+export async function shutdownPrisma() {
+    await prisma.$disconnect();
 }
 
-export default { prisma, shutdownPrisma };
+export default prisma;
