@@ -1,9 +1,9 @@
-import { User, Connection } from "@prisma/client";
+import { Session, User } from "lucia";
 
 declare global {
-	namespace Express {
-		interface Request {
-			user?: User;
-		}
-	}
+    namespace Express {
+        interface Request {
+            result: { user: User | null; session: Session };
+        }
+    }
 }

@@ -1,50 +1,53 @@
-import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
-import prismaClient from "../prisma/prismaClient";
+import { NextFunction, Request, Response } from "express";
+import { lucia } from "../auth/auth";
+import { Session, User } from "lucia";
 
 export const protectRoute = async (
-	req: Request,
-	res: Response,
-	next: NextFunction
+    req: Request,
+    res: Response,
+    next: NextFunction
 ): Promise<void> => {
-	try {
-		const token = req.cookies["jwt-token"];
-		if (!token) {
-			res.status(401).json({
-				message: "Unauthorized - No Token Provided",
-			});
-			return;
-		}
+    try {
+        const sessionId = req.cookies[lucia.sessionCookieName] ?? null;
+        if (!sessionId) {
+            res.status(401).json({
+                message: "Unauthorized - Session not found",
+            });
+            return;
+        }
 
-		const secret = process.env.JWT_SECRET;
-		if (!secret) {
-			res.status(500).json({
-				message: "Internal server error - JWT secret not configured",
-			});
-			return;
-		}
+        const result = await lucia.validateSession(sessionId);
+        if (result.session && result.session.fresh) {
+            const sessionCookie = lucia.createSessionCookie(result.session.id);
+            res.cookie(
+                sessionCookie.name,
+                sessionCookie.value,
+                sessionCookie.attributes
+            );
+        }
+        if (!result.session) {
+            const sessionCookie = lucia.createBlankSessionCookie();
+            res.cookie(
+                sessionCookie.name,
+                sessionCookie.value,
+                sessionCookie.attributes
+            );
+        }
+        if (!result.user) {
+            res.status(401).json({
+                message: "Unauthorized - User not found",
+            });
 
-		const decoded = jwt.verify(token, secret) as jwt.JwtPayload;
-		if (!decoded) {
-			res.status(401).json({ message: "Unauthorized - Invalid Token" });
-			return;
-		}
+            return;
+        }
 
-		const user = await prismaClient.prisma.user.findUnique({
-			where: {
-				id: decoded.userId,
-			},
-		});
+        req.result = result as { user: User; session: Session };
+        console.log("User authenticated");
+        console.log("User:", result.user, "Session:", result.session);
 
-		if (!user) {
-			res.status(401).json({ message: "User not found" });
-			return;
-		}
-
-		req.user = user;
-		next();
-	} catch (error: any) {
-		console.log("Error in protectRoute middleware:", error.message);
-		res.status(500).json({ message: "Internal server error" });
-	}
+        next();
+    } catch (error: any) {
+        console.log("Error in protectRoute middleware:", error.message);
+        res.status(500).json({ message: "Internal server error" });
+    }
 };
