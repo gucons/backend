@@ -29,5 +29,5 @@ jobs:
               run: |
                   echo "$SSH_PRIVATE_KEY" > private_key
                   chmod 600 private_key
-                  scp -o StrictHostKeyChecking=no -i private_key -r * $VPS_USER@$VPS_IP:/code/backend
+                  scp -o StrictHostKeyChecking=no -i private_key -r * $VPS_USER@$VPS_IP:code/backend
                   ssh -o StrictHostKeyChecking=no -i private_key $VPS_USER@$VPS_IP "cd code/backend && npm install --production && pm2 restart backend"
