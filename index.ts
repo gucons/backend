@@ -2,21 +2,27 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import path from "path";
 
 import authRoutes from "./src/routes/auth.route";
-import userRoutes from "./src/routes/user.route";
-import postRoutes from "./src/routes/post.route";
-import notificationRoutes from "./src/routes/notification.route";
 import connectionRoutes from "./src/routes/connection.route";
+import notificationRoutes from "./src/routes/notification.route";
+import postRoutes from "./src/routes/post.route";
+import userRoutes from "./src/routes/user.route";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const __dirname = path.resolve();
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
+
 const corsOptions = {
-    origin: process.env.CLIENT_URL,
+    origin: (origin: any, callback: any) => {
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
     credentials: true,
 };
 
@@ -29,17 +35,6 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/posts", postRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/connections", connectionRoutes);
-
-if (process.env.NODE_ENV === "production") {
-    console.log("Serving frontend...");
-    app.use(express.static(path.join(__dirname, "../frontend/dist")));
-
-    app.get("*", (req, res) => {
-        res.sendFile(
-            path.resolve(__dirname, "../frontend", "dist", "index.html")
-        );
-    });
-}
 
 app.get("/", (req, res) => {
     res.send("API is running...");
