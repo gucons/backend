@@ -5,33 +5,43 @@ import { Request, Response } from "express";
 import prismaClient from "../prisma/prismaClient";
 import { z } from "zod";
 import { UserRole } from "@prisma/client";
+import prisma from "../prisma/prismaClient";
+import { lucia } from "../auth/auth";
+
+const passwordSchema = z
+    .string()
+    .min(8, { message: "Password must be at least 8 characters long" })
+    .max(32, { message: "Password must be at most 32 characters long" })
+    .regex(/[a-z]/, {
+        message: "Password must contain at least one lowercase letter",
+    })
+    .regex(/[A-Z]/, {
+        message: "Password must contain at least one uppercase letter",
+    })
+    .regex(/[0-9]/, {
+        message: "Password must contain at least one number",
+    })
+    .regex(/[^a-zA-Z0-9]/, {
+        message: "Password must contain at least one special character",
+    });
 
 const signupSchema = z.object({
     email: z.string().email(),
-    password: z
-        .string()
-        .min(8, { message: "Password must be at least 8 characters long" })
-        .max(32, { message: "Password must be at most 32 characters long" })
-        .regex(/[a-z]/, {
-            message: "Password must contain at least one lowercase letter",
-        })
-        .regex(/[A-Z]/, {
-            message: "Password must contain at least one uppercase letter",
-        })
-        .regex(/[0-9]/, {
-            message: "Password must contain at least one number",
-        })
-        .regex(/[^a-zA-Z0-9]/, {
-            message: "Password must contain at least one special character",
-        }),
+    password: passwordSchema,
     role: z.nativeEnum(UserRole),
+});
+
+const loginSchema = z.object({
+    email: z.string().email(),
+    password: passwordSchema,
 });
 
 export const signup = async (req: Request, res: Response) => {
     try {
         const { email, password, role } = signupSchema.parse(req.body);
 
-        const existingEmail = await prismaClient.prisma.user.findUnique({
+        // Check if email is already in use
+        const existingEmail = await prisma.user.findUnique({
             where: { email },
         });
         if (existingEmail) {
@@ -42,10 +52,12 @@ export const signup = async (req: Request, res: Response) => {
             return;
         }
 
+        // Hash the password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const user = await prismaClient.prisma.user.create({
+        // Create the user
+        const user = await prisma.user.create({
             data: {
                 email,
                 password: hashedPassword,
@@ -53,62 +65,53 @@ export const signup = async (req: Request, res: Response) => {
             },
         });
 
-        const secret = process.env.JWT_SECRET;
-        if (!secret) {
-            res.status(500).json({
-                success: false,
-                message: "Internal server error - JWT secret not configured",
-            });
-            return;
-        }
+        // Create a new session using Lucia
+        const session = await lucia.createSession(user.id, {});
+        const sessionCookie = lucia.createSessionCookie(session.id);
 
-        const token = jwt.sign({ userId: user.id }, secret, {
-            expiresIn: "3d",
-        });
-
-        res.cookie("jwt-token", token, {
+        // Set the session cookie
+        res.cookie(sessionCookie.name, sessionCookie.value, {
             httpOnly: true,
-            maxAge: 3 * 24 * 60 * 60 * 1000,
+            // maxAge: sessionCookie.attributes.maxAge, // You might need to adjust this
             sameSite: "strict",
             secure: process.env.NODE_ENV === "production",
         });
 
+        // Respond with success
         res.status(200).json({
             success: true,
             message: "User registered successfully",
         });
 
-        const profileUrl = process.env.CLIENT_URL + "/profile/" + user.id; // Adjust based on your routing
-
+        // Optional: Send a welcome email (if needed)
+        const profileUrl = process.env.CLIENT_URL + "/profile/" + user.id;
         try {
-            console.log("Email sent to:", user.email);
-            // await sendWelcomeEmail(user.email, profileUrl);
+            console.log("Email sent to:", email);
+            // await sendWelcomeEmail(email, profileUrl);
         } catch (emailError) {
-            console.error("Error sending welcome Email", emailError);
+            console.error("Error sending welcome email", emailError);
         }
-    } catch (error: any) {
+    } catch (error) {
         if (error instanceof z.ZodError) {
             res.status(400).json({
                 success: false,
-                message: "Validation error",
-                errors: error.errors,
+                message: error.errors[0].message,
             });
             return;
         }
-        console.log("Error in signup: ", error.message);
+        console.log("Error in signup: ", error);
         res.status(500).json({
             success: false,
             message: "Internal server error",
         });
     }
 };
-
 export const login = async (req: Request, res: Response) => {
     try {
-        const { email, password } = req.body;
+        const { email, password } = loginSchema.parse(req.body);
 
         // Check if user exists
-        const user = await prismaClient.prisma.user.findUnique({
+        const user = await prisma.user.findUnique({
             where: { email },
         });
         if (!user) {
@@ -129,23 +132,14 @@ export const login = async (req: Request, res: Response) => {
             return;
         }
 
-        const secret = process.env.JWT_SECRET;
-        if (!secret) {
-            res.status(500).json({
-                success: false,
-                message: "Internal server error - JWT secret not configured",
-            });
-            return;
-        }
+        // Create a new session using Lucia
+        const session = await lucia.createSession(user.id, {});
+        const sessionCookie = lucia.createSessionCookie(session.id);
 
-        // Create and send token
-        const token = jwt.sign({ userId: user.id, email: user.email }, secret, {
-            expiresIn: "3d",
-        });
-
-        res.cookie("jwt-token", token, {
+        // Set the session cookie
+        res.cookie(sessionCookie.name, sessionCookie.value, {
             httpOnly: true,
-            maxAge: 3 * 24 * 60 * 60 * 1000,
+            // maxAge: sessionCookie.attributes.maxAge, // You might need to adjust this
             sameSite: "strict",
             secure: process.env.NODE_ENV === "production",
         });
@@ -155,28 +149,59 @@ export const login = async (req: Request, res: Response) => {
             message: "Logged in successfully",
         });
     } catch (error) {
-        console.error("Error in login controller:", error);
-        res.status(500).json({ success: false, message: "Server error" });
+        if (error instanceof z.ZodError) {
+            res.status(400).json({
+                success: false,
+                message: error.errors[0].message,
+            });
+            return;
+        }
+        console.log("Error in signup: ", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
     }
 };
 
-export const logout = (req: Request, res: Response) => {
-    res.clearCookie("jwt-token");
-    res.status(200).json({ success: true, message: "Logged out successfully" });
+export const logout = async (req: Request, res: Response) => {
+    try {
+        const { session } = req.result;
+
+        // Invalidate the session
+        await lucia.invalidateSession(session.id);
+
+        const sessionCookie = lucia.createBlankSessionCookie();
+        res.cookie(
+            sessionCookie.name,
+            sessionCookie.value,
+            sessionCookie.attributes
+        );
+        res.status(200).json({
+            success: true,
+            message: "Logged out successfully",
+        });
+    } catch (error) {
+        console.log("Error in logout: ", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
 };
 
 export const getCurrentUser = async (req: Request, res: Response) => {
     try {
+        const { user } = req.result;
         res.status(200).json({
             success: true,
-            user: {
-                id: req.user?.id,
-                email: req.user?.email,
-                role: req.user?.role,
-            },
+            user,
         });
     } catch (error) {
-        console.error("Error in getCurrentUser controller:", error);
-        res.status(500).json({ success: false, message: "Server error" });
+        console.error("Error in getCurrentUser controller: ", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
     }
 };
