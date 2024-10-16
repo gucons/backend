@@ -17,12 +17,15 @@ model User {
   updatedAt         DateTime    @updatedAt
   // Relations to a single role
   consultantProfile Consultant?
+  // Auth Sessions
+  Session           Session[]
 }
 
 enum UserRole {
   PENDING
   CONSULTANT
   BENCH_SALES
+  RECRUITER
 }
 
 model Consultant {
@@ -40,4 +43,12 @@ model Consultant {
   // Add timestamps if needed
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+
+  user User @relation(references: [id], fields: [userId], onDelete: Cascade)
 }
