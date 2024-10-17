@@ -33,18 +33,8 @@ export const protectRoute = async (
                 sessionCookie.attributes
             );
         }
-        if (!result.user) {
-            res.status(401).json({
-                message: "Unauthorized - User not found",
-            });
-
-            return;
-        }
 
         req.result = result as { user: User; session: Session };
-        console.log("User authenticated");
-        console.log("User:", result.user, "Session:", result.session);
-
         next();
     } catch (error: any) {
         console.log("Error in protectRoute middleware:", error.message);

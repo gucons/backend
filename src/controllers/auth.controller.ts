@@ -1,12 +1,9 @@
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { sendWelcomeEmail } from "../emails/emailHandlers";
-import { Request, Response } from "express";
-import prismaClient from "../prisma/prismaClient";
-import { z } from "zod";
 import { UserRole } from "@prisma/client";
-import prisma from "../prisma/prismaClient";
+import bcrypt from "bcryptjs";
+import { Request, Response } from "express";
+import { z } from "zod";
 import { lucia } from "../auth/auth";
+import prisma from "../prisma/prismaClient";
 
 const passwordSchema = z
     .string()
@@ -33,7 +30,7 @@ const signupSchema = z.object({
 
 const loginSchema = z.object({
     email: z.string().email(),
-    password: passwordSchema,
+    password: z.string(),
 });
 
 export const signup = async (req: Request, res: Response) => {
