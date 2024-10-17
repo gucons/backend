@@ -28,7 +28,7 @@ const corsOptions = {
 };
 
 app.options("*", cors(corsOptions)); // Enable pre-flight request for all routes
-app.use(cors(corsOptions)); // Enable CORS for all routes
+app.use(cors()); // Enable CORS for all routes
 app.use(express.json({ limit: "5mb" }));
 app.use(cookieParser());
 
