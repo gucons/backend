@@ -70,8 +70,8 @@ export const signup = async (req: Request, res: Response) => {
         res.cookie(sessionCookie.name, sessionCookie.value, {
             httpOnly: true,
             // maxAge: sessionCookie.attributes.maxAge, // You might need to adjust this
-            sameSite: "strict",
-            secure: process.env.NODE_ENV === "production",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Use 'none' in production for cross-origin
+            secure: process.env.NODE_ENV === "production", // Only set 'secure' in production (HTTPS)
         });
 
         // Respond with success
@@ -137,8 +137,8 @@ export const login = async (req: Request, res: Response) => {
         res.cookie(sessionCookie.name, sessionCookie.value, {
             httpOnly: true,
             // maxAge: sessionCookie.attributes.maxAge, // You might need to adjust this
-            sameSite: "strict",
-            secure: process.env.NODE_ENV === "production",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Use 'none' in production for cross-origin
+            secure: process.env.NODE_ENV === "production", // Only set 'secure' in production (HTTPS)
         });
 
         res.status(200).json({
