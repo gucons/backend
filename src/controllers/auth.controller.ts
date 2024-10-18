@@ -73,6 +73,7 @@ export const signup = async (req: Request, res: Response) => {
         res.cookie(sessionCookie.name, sessionCookie.value, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
+            sameSite: "none",
         });
 
         // Respond with success
@@ -138,6 +139,7 @@ export const login = async (req: Request, res: Response) => {
         res.cookie(sessionCookie.name, sessionCookie.value, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
+            sameSite: "none",
         });
 
         res.status(200).json({
