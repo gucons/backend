@@ -72,8 +72,6 @@ export const signup = async (req: Request, res: Response) => {
         // Set the session cookie
         res.cookie(sessionCookie.name, sessionCookie.value, {
             httpOnly: true,
-            // maxAge: sessionCookie.attributes.maxAge, // You might need to adjust this
-            sameSite: "strict",
             secure: process.env.NODE_ENV === "production",
         });
 
@@ -139,8 +137,6 @@ export const login = async (req: Request, res: Response) => {
         // Set the session cookie
         res.cookie(sessionCookie.name, sessionCookie.value, {
             httpOnly: true,
-            // maxAge: sessionCookie.attributes.maxAge, // You might need to adjust this
-            sameSite: "strict",
             secure: process.env.NODE_ENV === "production",
         });
 
