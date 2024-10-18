@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import express from "express";
 
 import authRoutes from "./src/routes/auth.route";
+import consultantRoutes from "./src/routes/consultant.route";
 import connectionRoutes from "./src/routes/connection.route";
 import notificationRoutes from "./src/routes/notification.route";
 import postRoutes from "./src/routes/post.route";
@@ -31,6 +32,7 @@ app.use(express.json({ limit: "5mb" }));
 app.use(cookieParser());
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/consultant", consultantRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/posts", postRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
