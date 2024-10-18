@@ -17,18 +17,16 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
 
 const corsOptions = {
     origin: (origin: any, callback: any) => {
-        // Allow requests with no origin (like mobile apps, Postman, server-side)
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
             callback(new Error("Not allowed by CORS"));
         }
     },
-    credentials: true, // Enable credentials (Required for cookies)
+    credentials: true,
 };
 
-app.options("*", cors(corsOptions)); // Enable pre-flight request for all routes
-app.use(cors()); // Enable CORS for all routes
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "5mb" }));
 app.use(cookieParser());
 

@@ -1,9 +1,12 @@
-import { UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { sendWelcomeEmail } from "../emails/emailHandlers";
 import { Request, Response } from "express";
+import prismaClient from "../prisma/prismaClient";
 import { z } from "zod";
-import { lucia } from "../auth/auth";
+import { UserRole } from "@prisma/client";
 import prisma from "../prisma/prismaClient";
+import { lucia } from "../auth/auth";
 
 const passwordSchema = z
     .string()
@@ -30,7 +33,7 @@ const signupSchema = z.object({
 
 const loginSchema = z.object({
     email: z.string().email(),
-    password: z.string(),
+    password: passwordSchema,
 });
 
 export const signup = async (req: Request, res: Response) => {
@@ -70,8 +73,8 @@ export const signup = async (req: Request, res: Response) => {
         res.cookie(sessionCookie.name, sessionCookie.value, {
             httpOnly: true,
             // maxAge: sessionCookie.attributes.maxAge, // You might need to adjust this
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Use 'none' in production for cross-origin
-            secure: process.env.NODE_ENV === "production", // Only set 'secure' in production (HTTPS)
+            sameSite: "strict",
+            secure: process.env.NODE_ENV === "production",
         });
 
         // Respond with success
@@ -137,8 +140,8 @@ export const login = async (req: Request, res: Response) => {
         res.cookie(sessionCookie.name, sessionCookie.value, {
             httpOnly: true,
             // maxAge: sessionCookie.attributes.maxAge, // You might need to adjust this
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Use 'none' in production for cross-origin
-            secure: process.env.NODE_ENV === "production", // Only set 'secure' in production (HTTPS)
+            sameSite: "strict",
+            secure: process.env.NODE_ENV === "production",
         });
 
         res.status(200).json({
