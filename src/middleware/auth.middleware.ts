@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
-import { lucia } from "../auth/auth";
 import { Session, User } from "lucia";
+import { lucia } from "../auth/auth";
+import { AuthenticatedRequest } from "../@types/authenticatedRequest";
 
 export const protectRoute = async (
     req: Request,
@@ -16,6 +17,7 @@ export const protectRoute = async (
             return;
         }
 
+        // Validate the session from DB
         const result = await lucia.validateSession(sessionId);
         if (result.session && result.session.fresh) {
             const sessionCookie = lucia.createSessionCookie(result.session.id);
@@ -40,10 +42,10 @@ export const protectRoute = async (
             return;
         }
 
-        req.result = result as { user: User; session: Session };
-        console.log("User authenticated");
-        console.log("User:", result.user, "Session:", result.session);
-
+        (req as AuthenticatedRequest).authData = result as {
+            user: User;
+            session: Session;
+        };
         next();
     } catch (error: any) {
         console.log("Error in protectRoute middleware:", error.message);

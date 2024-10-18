@@ -1,12 +1,10 @@
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { sendWelcomeEmail } from "../emails/emailHandlers";
-import { Request, Response } from "express";
-import prismaClient from "../prisma/prismaClient";
-import { z } from "zod";
 import { UserRole } from "@prisma/client";
-import prisma from "../prisma/prismaClient";
+import bcrypt from "bcryptjs";
+import { Request, Response } from "express";
+import { z } from "zod";
 import { lucia } from "../auth/auth";
+import prisma from "../prisma/prismaClient";
+import { AuthenticatedRequest } from "../@types/authenticatedRequest";
 
 const passwordSchema = z
     .string()
@@ -164,7 +162,7 @@ export const login = async (req: Request, res: Response) => {
 
 export const logout = async (req: Request, res: Response) => {
     try {
-        const { session } = req.result;
+        const { session } = (req as AuthenticatedRequest).authData;
 
         // Invalidate the session
         await lucia.invalidateSession(session.id);
@@ -188,15 +186,43 @@ export const logout = async (req: Request, res: Response) => {
     }
 };
 
+export const verifySession = async (req: Request, res: Response) => {
+    try {
+        const { sessionId } = req.body;
+        if (!sessionId) {
+            res.status(401).json({
+                message: "Unauthorized - Session not found",
+            });
+            return;
+        }
+        const { session, user } = await lucia.validateSession(sessionId);
+        if (!session || !user) {
+            res.status(401).json({
+                message: "Unauthorized - Invalid session",
+            });
+        }
+        res.status(200).json({
+            success: true,
+            message: "Session is valid",
+        });
+    } catch (error) {
+        console.log("Error in verifySession: ", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
+
 export const getCurrentUser = async (req: Request, res: Response) => {
     try {
-        const { user } = req.result;
+        const { user } = (req as AuthenticatedRequest).authData;
         res.status(200).json({
             success: true,
             user,
         });
     } catch (error) {
-        console.error("Error in getCurrentUser controller: ", error);
+        console.log("Error in getCurrentUser controller: ", error);
         res.status(500).json({
             success: false,
             message: "Internal server error",
