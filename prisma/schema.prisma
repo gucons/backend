@@ -15,8 +15,10 @@ model User {
   role              UserRole    @default(PENDING)
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
-  // Relations to a single role
+  // Relations to roles
   consultantProfile Consultant?
+  benchSalesProfile BenchSales?
+  recruiterProfile  Recruiter?
   // Auth Sessions
   Session           Session[]
 }
@@ -29,20 +31,47 @@ enum UserRole {
 }
 
 model Consultant {
-  id             String   @id @default(uuid())
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id])
+  id             String      @id @default(uuid())
+  userId         String      @unique
+  user           User        @relation(fields: [userId], references: [id])
   // Basic Info
-  firstName      String // Candidate's first name
-  lastName       String // Candidate's last name
-  profilePicture String   @default("") // Upload or link to a professional photo
-  contactEmail   String   @unique // Candidate's email address
-  phoneNumber    String? // Contact number
-  location       String? // City, State/Province, Country
-  timeZone       String? // Candidate's timezone for scheduling purposes
+  firstName      String
+  lastName       String
+  contactEmail   String      @unique
+  profilePicture String?
+  phoneNumber    String?
+  location       String?
+  timeZone       String?
   // Add timestamps if needed
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  BenchSales     BenchSales? @relation(fields: [benchSalesId], references: [id])
+  benchSalesId   String?
+}
+
+model BenchSales {
+  id           String       @id @default(uuid())
+  userId       String       @unique
+  user         User         @relation(fields: [userId], references: [id])
+  // Consultants under Bench Sales
+  consultants  Consultant[]
+  company      String? // Bench Sales company name
+  contactEmail String?      @unique
+  // Add timestamps if needed
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Recruiter {
+  id           String       @id @default(uuid())
+  userId       String       @unique
+  user         User         @relation(fields: [userId], references: [id])
+  company      String? // Recruiter company
+  contactEmail String?      @unique
+  jobPostings  JobPosting[]
+  // Add timestamps if needed
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 }
 
 model Session {
@@ -51,4 +80,17 @@ model Session {
   expiresAt DateTime
 
   user User @relation(references: [id], fields: [userId], onDelete: Cascade)
+}
+
+model JobPosting {
+  id          String    @id @default(uuid())
+  recruiterId String
+  title       String
+  description String
+  location    String
+  salaryRange String?
+  // Relation to Recruiter
+  recruiter   Recruiter @relation(fields: [recruiterId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }

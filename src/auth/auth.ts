@@ -5,8 +5,6 @@ import prisma from "../prisma/prismaClient";
 
 const adapter = new PrismaAdapter(prisma.session, prisma.user);
 
-interface DatabaseUserAttributes extends User {}
-
 export const lucia = new Lucia(adapter, {
     sessionCookie: {
         expires: false,
@@ -18,6 +16,7 @@ export const lucia = new Lucia(adapter, {
         return {
             id: attributes.id,
             email: attributes.email,
+            role: attributes.role,
         };
     },
 });
@@ -25,6 +24,6 @@ export const lucia = new Lucia(adapter, {
 declare module "lucia" {
     interface Register {
         Lucia: typeof lucia;
-        DatabaseUserAttributes: DatabaseUserAttributes;
+        DatabaseUserAttributes: User;
     }
 }

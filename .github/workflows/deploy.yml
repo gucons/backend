@@ -30,5 +30,6 @@ jobs:
                     cd code/backend && \
                     git pull origin master && \
                     npm install --production && \
+                    npx prisma db push && \
                     pm2 restart backend
                   "
