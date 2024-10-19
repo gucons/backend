@@ -8,8 +8,9 @@ import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import { z } from "zod";
 import { AuthenticatedRequest } from "../@types/authenticatedRequest";
-import { google, lucia } from "../auth/auth";
+import { google, linkedin, lucia } from "../auth/auth";
 import prisma from "../prisma/prismaClient";
+import { linkedinOAuthUser } from "../@types/linkdinUser";
 
 const passwordSchema = z
     .string()
@@ -325,6 +326,148 @@ export const googleOAuthCallback = async (req: Request, res: Response) => {
             return;
         }
         console.log("Error in googleOAuthCallback: ", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
+
+export const linkedinOAuth = async (req: Request, res: Response) => {
+    try {
+        const state = generateState();
+        const authorizationUrl = await linkedin.createAuthorizationURL(state, {
+            scopes: ["r_liteprofile", "r_emailaddress"],
+        });
+
+        // Store the state in cookies
+        res.cookie("linkedin_oauth_state", state, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "none",
+            expires: new Date(Date.now() + 600000), // Expires in 10 minutes
+        });
+
+        // Redirect the user to the LinkedIn OAuth URL
+        res.status(200).redirect(authorizationUrl.toString());
+    } catch (error) {
+        console.log("Error in linkedinOAuth: ", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
+
+export const linkedinOAuthCallback = async (req: Request, res: Response) => {
+    try {
+        const { code, state } = req.query as {
+            code: string;
+            state: string;
+        };
+        const storedState = req.cookies["linkedin_oauth_state"] ?? null;
+
+        const blankSessionCookie = lucia.createBlankSessionCookie();
+
+        // Check if the state is valid and matches the stored state
+        if (!code || !state || !storedState || state !== storedState) {
+            // Clear the session cookie
+            res.header("Set-Cookie", blankSessionCookie.serialize());
+            res.cookie(
+                blankSessionCookie.value,
+                blankSessionCookie.name,
+                blankSessionCookie.attributes
+            );
+            res.status(400).json({
+                success: false,
+                message: "Invalid state",
+            });
+            return;
+        }
+
+        // Exchange the code for an access token
+        const tokens = await linkedin.validateAuthorizationCode(code);
+        const accessToken = tokens.accessToken;
+        const refreshToken = tokens.refreshToken;
+
+        const linkedinUserResponse = await fetch(
+            "https://api.linkedin.com/v2/me",
+            {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            }
+        );
+
+        const linkedinUser = await linkedinUserResponse.json();
+
+        // Check if the user already exists
+        let user = await prisma.user.findUnique({
+            where: { email: linkedinUser.email },
+        });
+
+        // If user doesn't exist, create a new User
+        if (!user) {
+            user = await prisma.user.create({
+                data: {
+                    email: linkedinUser.email,
+                    emailVerified: true,
+                    role: "PENDING",
+                    authType: "OAUTH",
+                },
+            });
+        }
+
+        // Create or update the Account entry
+        await prisma.account.upsert({
+            where: {
+                // Ensure a unique identifier for the account
+                provider_providerAccountId: {
+                    provider: "LINKEDIN",
+                    providerAccountId: linkedinUser.id,
+                },
+            },
+            update: {
+                accessToken,
+                refreshToken,
+            },
+            create: {
+                userId: user.id,
+                provider: "LINKEDIN",
+                providerAccountId: linkedinUser.id,
+                accessToken,
+                refreshToken,
+                expiresAt: linkedinUser.exp,
+                tokenType: "Bearer",
+                scope: ["r_liteprofile", "r_emailaddress"],
+            },
+        });
+
+        // Create a new session using Lucia
+        const session = await lucia.createSession(user.id, {});
+        const sessionCookie = lucia.createSessionCookie(session.id);
+
+        // Set the session cookie
+        res.cookie(sessionCookie.name, sessionCookie.value, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "none",
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Logged in successfully",
+            user: linkedinUser,
+        });
+    } catch (error) {
+        if (error instanceof OAuth2RequestError) {
+            res.status(400).json({
+                success: false,
+                message: error.message,
+            });
+            return;
+        }
+        console.log("Error in linkedinOAuthCallback: ", error);
         res.status(500).json({
             success: false,
             message: "Internal server error",

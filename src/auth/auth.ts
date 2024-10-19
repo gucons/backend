@@ -1,6 +1,6 @@
 import { PrismaAdapter } from "@lucia-auth/adapter-prisma";
 import { User } from "@prisma/client";
-import { Google } from "arctic";
+import { Google, LinkedIn } from "arctic";
 import { Lucia } from "lucia";
 import prisma from "../prisma/prismaClient";
 
@@ -34,4 +34,10 @@ export const google = new Google(
     process.env.GOOGLE_CLIENT_ID!,
     process.env.GOOGLE_CLIENT_SECRET!,
     `${process.env.APP_URL}/api/v1/auth/oauth/google/callback`
+);
+
+export const linkedin  = new LinkedIn(
+    process.env.LINKEDIN_CLIENT_ID!,
+    process.env.LINKEDIN_CLIENT_SECRET!,
+    `${process.env.APP_URL}/api/v1/auth/oauth/linkedin/callback`
 );
