@@ -112,7 +112,7 @@ model Account {
   refreshToken      String?
   expiresAt         Int?
   tokenType         String?
-  scope             String?
+  scope             String[]
   idToken           String?
   sessionState      String?
   user              User     @relation(fields: [userId], references: [id])

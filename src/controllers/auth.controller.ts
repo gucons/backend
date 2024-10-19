@@ -1,16 +1,15 @@
 import { UserRole } from "@prisma/client";
-import bcrypt from "bcryptjs";
-import { Request, Response } from "express";
-import { z } from "zod";
-import { google, lucia } from "../auth/auth";
-import prisma from "../prisma/prismaClient";
-import { AuthenticatedRequest } from "../@types/authenticatedRequest";
 import {
     generateCodeVerifier,
     generateState,
     OAuth2RequestError,
 } from "arctic";
-import { GoogleOauth2User } from "../@types/googleUser";
+import bcrypt from "bcryptjs";
+import { Request, Response } from "express";
+import { z } from "zod";
+import { AuthenticatedRequest } from "../@types/authenticatedRequest";
+import { google, lucia } from "../auth/auth";
+import prisma from "../prisma/prismaClient";
 
 const passwordSchema = z
     .string()
@@ -116,9 +115,12 @@ export const login = async (req: Request, res: Response) => {
 
         // Check if user exists
         const user = await prisma.user.findUnique({
-            where: { email },
+            where: {
+                email,
+            },
         });
-        if (!user) {
+        // Check if user exists and is a standard user
+        if (!user || user.authType !== "EMAIL" || user.password === null) {
             res.status(400).json({
                 success: false,
                 message: "Invalid credentials",
@@ -175,7 +177,7 @@ export const googleOAuth = async (req: Request, res: Response) => {
             state,
             codeVerifier,
             {
-                scopes: ["openid", "profile"],
+                scopes: ["openid", "profile", "email"],
             }
         );
 
@@ -214,7 +216,7 @@ export const googleOAuthCallback = async (req: Request, res: Response) => {
         const storedCodeVerifier =
             req.cookies["google_oauth_code_verifier"] ?? null;
 
-        const sessionCookie = lucia.createBlankSessionCookie();
+        const blankSessionCookie = lucia.createBlankSessionCookie();
 
         // Check if the state is valid and matches the stored state
         if (
@@ -225,11 +227,11 @@ export const googleOAuthCallback = async (req: Request, res: Response) => {
             state !== storedState
         ) {
             // Clear the session cookie
-            res.header("Set-Cookie", sessionCookie.serialize());
+            res.header("Set-Cookie", blankSessionCookie.serialize());
             res.cookie(
-                sessionCookie.name,
-                sessionCookie.value,
-                sessionCookie.attributes
+                blankSessionCookie.value,
+                blankSessionCookie.name,
+                blankSessionCookie.attributes
             );
             res.status(400).json({
                 success: false,
@@ -244,6 +246,7 @@ export const googleOAuthCallback = async (req: Request, res: Response) => {
             storedCodeVerifier
         );
         const accessToken = tokens.accessToken;
+        const refreshToken = tokens.refreshToken;
 
         const googleUserResponse = await fetch(
             "https://openidconnect.googleapis.com/v1/userinfo",
@@ -254,56 +257,65 @@ export const googleOAuthCallback = async (req: Request, res: Response) => {
             }
         );
 
-        const googleUser = await googleUserResponse.json();
-        res.status(200).json({
-            success: true,
-            googleUser,
+        const googleUser: GoogleOauth2User = await googleUserResponse.json();
+
+        // Check if the user already exists
+        let user = await prisma.user.findUnique({
+            where: { email: googleUser.email },
         });
 
-        // // Check if the user already exists in the User model
-        // let user = await prisma.user.findUnique({
-        //     where: { email: googleUser.email },
-        // });
+        // If user doesn't exist, create a new User
+        if (!user) {
+            user = await prisma.user.create({
+                data: {
+                    email: googleUser.email,
+                    emailVerified: googleUser.email_verified,
+                    role: "PENDING",
+                    authType: "OAUTH",
+                },
+            });
+        }
 
-        // // If user doesn't exist, create a new User entry
-        // if (!user) {
-        //     user = await prisma.user.create({
-        //         data: {
-        //             email: googleUser.email,
-        //             role: "PENDING", // Set role as needed
-        //             authType: "OAUTH",
-        //         },
-        //     });
-        // }
+        // Create or update the Account entry
+        await prisma.account.upsert({
+            where: {
+                // Ensure a unique identifier for the account
+                provider_providerAccountId: {
+                    provider: "GOOGLE",
+                    providerAccountId: googleUser.sub,
+                },
+            },
+            update: {
+                accessToken,
+                refreshToken,
+            },
+            create: {
+                userId: user.id,
+                provider: "GOOGLE",
+                providerAccountId: googleUser.sub,
+                accessToken,
+                refreshToken,
+                expiresAt: googleUser.exp,
+                tokenType: "Bearer",
+                scope: ["openid", "profile", "email"],
+            },
+        });
 
-        // // Create or update the Account entry
-        // await prisma.account.upsert({
-        //     where: {
-        //         // Ensure you have a unique identifier for the account
-        //         provider_account_id: {
-        //             provider: "GOOGLE",
-        //             providerAccountId: googleUser.sub,
-        //         },
-        //     },
-        //     update: {
-        //         accessToken,
-        //         // You can also update other fields like refreshToken, etc.
-        //     },
-        //     create: {
-        //         userId: user.id,
-        //         provider: "GOOGLE",
-        //         providerAccountId: googleUser.sub,
-        //         accessToken,
-        //         // Optionally, store other fields from the response if needed
-        //     },
-        // });
+        // Create a new session using Lucia
+        const session = await lucia.createSession(user.id, {});
+        const sessionCookie = lucia.createSessionCookie(session.id);
 
-        // // Send response back to the user
-        // res.status(200).json({
-        //     success: true,
-        //     googleUser,
-        //     user,
-        // });
+        // Set the session cookie
+        res.cookie(sessionCookie.name, sessionCookie.value, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "none",
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Logged in successfully",
+        });
     } catch (error) {
         if (error instanceof OAuth2RequestError) {
             res.status(400).json({
