@@ -2,6 +2,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import morgan from "morgan";
 
 import authRoutes from "./src/routes/auth.route";
 import consultantRoutes from "./src/routes/consultant.route";
@@ -17,17 +18,24 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
 
 const corsOptions = {
-    origin: (origin: any, callback: any) => {
+    origin: (origin: string | undefined, callback: any) => {
+        if (!origin) {
+            // Allow requests with no origin (like Postman or server-side)
+            console.log("No origin provided, allowing request.");
+            return callback(null, true);
+        }
         if (allowedOrigins.includes(origin)) {
-            callback(null, true);
+            callback(null, true); // Origin is allowed
         } else {
+            console.error(`CORS Error: Origin ${origin} not allowed.`);
             callback(new Error("Not allowed by CORS"));
         }
     },
-    credentials: true,
+    credentials: true, // Support cookies, authorization headers
 };
 
 app.use(cors(corsOptions));
+app.use(morgan("dev"));
 app.use(express.json({ limit: "5mb" }));
 app.use(cookieParser());
 
