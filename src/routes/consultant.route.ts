@@ -1,4 +1,4 @@
-import express, { Response } from "express";
+import express, { Request, Response } from "express";
 import {
     createConsultant,
     retrieveConsultant,
@@ -9,7 +9,7 @@ import { ensureLoggedConsultant } from "../middleware/consultant.middleware";
 
 const router = express.Router();
 
-router.get("/", async (res: Response) => {
+router.get("/", async (req: Request, res: Response) => {
     res.status(200).json({
         success: true,
         message: "Consultant Route is working",

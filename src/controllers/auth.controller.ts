@@ -2,9 +2,14 @@ import { UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import { z } from "zod";
-import { lucia } from "../auth/auth";
+import { google, lucia } from "../auth/auth";
 import prisma from "../prisma/prismaClient";
 import { AuthenticatedRequest } from "../@types/authenticatedRequest";
+import {
+    generateCodeVerifier,
+    generateState,
+    OAuth2RequestError,
+} from "arctic";
 
 const passwordSchema = z
     .string()
@@ -103,6 +108,7 @@ export const signup = async (req: Request, res: Response) => {
         });
     }
 };
+
 export const login = async (req: Request, res: Response) => {
     try {
         const { email, password } = loginSchema.parse(req.body);
@@ -153,6 +159,108 @@ export const login = async (req: Request, res: Response) => {
             return;
         }
         console.log("Error in signup: ", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
+
+export const googleOAuth = async (req: Request, res: Response) => {
+    try {
+        const state = generateState();
+        const codeVerifier = generateCodeVerifier();
+        const authorizationUrl = await google.createAuthorizationURL(
+            state,
+            codeVerifier,
+            {
+                scopes: ["openid", "profile"],
+            }
+        );
+
+        // Store the state and code verifier in cookies
+        res.cookie("google_oauth_state", state, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "none",
+            expires: new Date(Date.now() + 600000), // Expires in 10 minutes
+        });
+        res.cookie("google_oauth_code_verifier", codeVerifier, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "none",
+            expires: new Date(Date.now() + 600000), // Expires in 10 minutes
+        });
+
+        // Redirect the user to the Google OAuth URL
+        res.status(200).redirect(authorizationUrl.toString());
+    } catch (error) {
+        console.log("Error in googleOAuth: ", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
+
+export const googleOAuthCallback = async (req: Request, res: Response) => {
+    try {
+        const { code, state } = req.query as {
+            code: string;
+            state: string;
+        };
+        const storedState = req.cookies["google_oauth_state"] ?? null;
+        const storedCodeVerifier =
+            req.cookies["google_oauth_code_verifier"] ?? null;
+
+        const sessionCookie = lucia.createBlankSessionCookie();
+
+        // Check if the state is valid and matches the stored state
+        if (
+            !code ||
+            !state ||
+            !storedState ||
+            !storedCodeVerifier ||
+            state !== storedState
+        ) {
+            // Clear the session cookie
+            res.header("Set-Cookie", sessionCookie.serialize());
+            res.cookie(
+                sessionCookie.name,
+                sessionCookie.value,
+                sessionCookie.attributes
+            );
+            res.status(400).json({
+                success: false,
+                message: "Invalid state",
+            });
+            return;
+        }
+
+        // Exchange the code for an access token
+        const tokens = await google.validateAuthorizationCode(
+            code,
+            storedCodeVerifier
+        );
+        const accessToken = tokens.accessToken;
+
+        const googleUserResponse = await fetch(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            }
+        );
+    } catch (error) {
+        if (error instanceof OAuth2RequestError) {
+            res.status(400).json({
+                success: false,
+                message: error.message,
+            });
+            return;
+        }
+        console.log("Error in googleOAuthCallback: ", error);
         res.status(500).json({
             success: false,
             message: "Internal server error",
