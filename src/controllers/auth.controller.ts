@@ -246,18 +246,64 @@ export const googleOAuthCallback = async (req: Request, res: Response) => {
         const accessToken = tokens.accessToken;
 
         const googleUserResponse = await fetch(
-            "https://www.googleapis.com/oauth2/v3/userinfo",
+            "https://openidconnect.googleapis.com/v1/userinfo",
             {
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                 },
             }
         );
+
         const googleUser = await googleUserResponse.json();
         res.status(200).json({
             success: true,
             googleUser,
         });
+
+        // // Check if the user already exists in the User model
+        // let user = await prisma.user.findUnique({
+        //     where: { email: googleUser.email },
+        // });
+
+        // // If user doesn't exist, create a new User entry
+        // if (!user) {
+        //     user = await prisma.user.create({
+        //         data: {
+        //             email: googleUser.email,
+        //             role: "PENDING", // Set role as needed
+        //             authType: "OAUTH",
+        //         },
+        //     });
+        // }
+
+        // // Create or update the Account entry
+        // await prisma.account.upsert({
+        //     where: {
+        //         // Ensure you have a unique identifier for the account
+        //         provider_account_id: {
+        //             provider: "GOOGLE",
+        //             providerAccountId: googleUser.sub,
+        //         },
+        //     },
+        //     update: {
+        //         accessToken,
+        //         // You can also update other fields like refreshToken, etc.
+        //     },
+        //     create: {
+        //         userId: user.id,
+        //         provider: "GOOGLE",
+        //         providerAccountId: googleUser.sub,
+        //         accessToken,
+        //         // Optionally, store other fields from the response if needed
+        //     },
+        // });
+
+        // // Send response back to the user
+        // res.status(200).json({
+        //     success: true,
+        //     googleUser,
+        //     user,
+        // });
     } catch (error) {
         if (error instanceof OAuth2RequestError) {
             res.status(400).json({

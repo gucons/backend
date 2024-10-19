@@ -1,10 +1,13 @@
 export interface GoogleOauth2User {
-    id: string;
+    iss: string;
+    azp: string;
+    aud: string;
+    sub: string;
+    at_hash: string;
+    hd: string;
     email: string;
-    verified_email: boolean;
-    name: string;
-    given_name: string;
-    family_name: string;
-    picture: string;
-    locale: string;
+    email_verified: string;
+    iat: number;
+    exp: number;
+    nonce: string;
 }
