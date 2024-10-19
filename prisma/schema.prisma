@@ -10,9 +10,10 @@ datasource db {
 model User {
   id                String      @id @default(uuid())
   email             String      @unique
-  password          String
+  password          String?
   emailVerified     Boolean     @default(false)
   role              UserRole    @default(PENDING)
+  authType          AuthType    @default(EMAIL)
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   // Relations to roles
@@ -21,6 +22,8 @@ model User {
   recruiterProfile  Recruiter?
   // Auth Sessions
   Session           Session[]
+  // OAuth Accounts
+  accounts          Account[]
 }
 
 enum UserRole {
@@ -28,6 +31,11 @@ enum UserRole {
   CONSULTANT
   BENCH_SALES
   RECRUITER
+}
+
+enum AuthType {
+  EMAIL
+  OAUTH
 }
 
 model Consultant {
@@ -93,4 +101,26 @@ model JobPosting {
   recruiter   Recruiter @relation(fields: [recruiterId], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+model Account {
+  id                String   @id @default(uuid())
+  userId            String
+  provider          Provider
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         Int?
+  tokenType         String?
+  scope             String?
+  idToken           String?
+  sessionState      String?
+  user              User     @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerAccountId])
+}
+
+enum Provider {
+  GOOGLE
+  LINKEDIN
 }

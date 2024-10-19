@@ -10,6 +10,7 @@ import {
     generateState,
     OAuth2RequestError,
 } from "arctic";
+import { GoogleOauth2User } from "../@types/googleUser";
 
 const passwordSchema = z
     .string()
@@ -245,13 +246,18 @@ export const googleOAuthCallback = async (req: Request, res: Response) => {
         const accessToken = tokens.accessToken;
 
         const googleUserResponse = await fetch(
-            "https://openidconnect.googleapis.com/v1/userinfo",
+            "https://www.googleapis.com/oauth2/v3/userinfo",
             {
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                 },
             }
         );
+        const googleUser = await googleUserResponse.json();
+        res.status(200).json({
+            success: true,
+            googleUser,
+        });
     } catch (error) {
         if (error instanceof OAuth2RequestError) {
             res.status(400).json({
