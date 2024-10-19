@@ -1,5 +1,6 @@
 import { PrismaAdapter } from "@lucia-auth/adapter-prisma";
 import { User } from "@prisma/client";
+import { Google } from "arctic";
 import { Lucia } from "lucia";
 import prisma from "../prisma/prismaClient";
 
@@ -27,3 +28,10 @@ declare module "lucia" {
         DatabaseUserAttributes: User;
     }
 }
+
+// OAuth providers
+export const google = new Google(
+    process.env.GOOGLE_CLIENT_ID!,
+    process.env.GOOGLE_CLIENT_SECRET!,
+    `${process.env.APP_URL}/api/v1/auth/oauth/google/callback`
+);
