@@ -337,7 +337,13 @@ export const linkedinOAuth = async (req: Request, res: Response) => {
     try {
         const state = generateState();
         const authorizationUrl = await linkedin.createAuthorizationURL(state, {
-            scopes: ["r_liteprofile", "r_emailaddress"],
+            scopes: [
+                "r_liteprofile",
+                "r_emailaddress",
+                "openid",
+                "profile",
+                "email",
+            ],
         });
 
         // Store the state in cookies
@@ -439,7 +445,13 @@ export const linkedinOAuthCallback = async (req: Request, res: Response) => {
                 refreshToken,
                 expiresAt: linkedinUser.exp,
                 tokenType: "Bearer",
-                scope: ["r_liteprofile", "r_emailaddress"],
+                scope: [
+                    "r_liteprofile",
+                    "r_emailaddress",
+                    "openid",
+                    "profile",
+                    "email",
+                ],
             },
         });
 
