@@ -405,7 +405,7 @@ export const linkedinOAuthCallback = async (req: Request, res: Response) => {
             }
         );
 
-        const linkedinUser = await linkedinUserResponse.json();
+        const linkedinUser: linkedinOAuthUser = await linkedinUserResponse.json();
 
         // Check if the user already exists
         let user = await prisma.user.findUnique({
@@ -430,7 +430,7 @@ export const linkedinOAuthCallback = async (req: Request, res: Response) => {
                 // Ensure a unique identifier for the account
                 provider_providerAccountId: {
                     provider: "LINKEDIN",
-                    providerAccountId: linkedinUser.id,
+                    providerAccountId: linkedinUser.sub,
                 },
             },
             update: {
@@ -440,10 +440,9 @@ export const linkedinOAuthCallback = async (req: Request, res: Response) => {
             create: {
                 userId: user.id,
                 provider: "LINKEDIN",
-                providerAccountId: linkedinUser.id,
+                providerAccountId: linkedinUser.sub,
                 accessToken,
                 refreshToken,
-                expiresAt: linkedinUser.exp,
                 tokenType: "Bearer",
                 scope: [
                     "r_liteprofile",
